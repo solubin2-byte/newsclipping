@@ -600,8 +600,8 @@ function init() {
   _naverSecret = localStorage.getItem(LS.nsec)  || '';
   _claudeKey   = localStorage.getItem(LS.ckey)  || '';
   if (_naverId) document.getElementById('naverIdInput').value = _naverId;
-  if (_naverSecret) document.getElementById('naverSecretInput').value = '••••••••';
-  if (_claudeKey) document.getElementById('claudeKeyInput').value = '••••••••';
+  if (_naverSecret) document.getElementById('naverSecretInput').value = '********';
+  if (_claudeKey) document.getElementById('claudeKeyInput').value = '********';
   const useClassify = localStorage.getItem(LS.classify) === 'true';
   document.getElementById('useClaudeClassify').checked = useClassify;
   updateBanner();
