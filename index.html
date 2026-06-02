@@ -48,7 +48,8 @@
   .main{margin-left:220px;min-height:100vh;}
 
   /* ── KEY BANNER ── */
-  .key-banner{padding:10px 28px;display:flex;align-items:center;gap:10px;font-size:13px;border-bottom:1px solid var(--border);}
+  .key-banner{padding:10px 28px;display:flex;align-items:center;gap:10px;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s;}
+  .key-banner:hover{opacity:.92;}
   .key-banner.warn{background:#FFFBEA;border-bottom-color:#F0E080;color:#7A5F00;}
   .key-banner.ok{background:#F0FAF4;border-bottom-color:#B0DFBF;color:#1A5C35;}
   .key-banner input{padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;font-family:'DM Mono',monospace;background:#fff;color:var(--text);width:220px;}
@@ -259,19 +260,70 @@
 <main class="main">
 
   <!-- KEY BANNER -->
-  <div class="key-banner warn" id="keyBanner">
-    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-    <span style="font-weight:600;white-space:nowrap" id="bannerMsg">API 키 설정</span>
-    <span class="sep">|</span>
-    <span style="white-space:nowrap;color:var(--text2)">네이버</span>
-    <input type="text" id="naverIdInput" placeholder="Client ID" style="width:130px" />
-    <input type="password" id="naverSecretInput" placeholder="Client Secret" style="width:130px" />
-    <button class="btn btn-sm" style="background:var(--text);color:#fff;border:none;font-size:11px;" onclick="saveNaverKey()">저장</button>
-    <span class="sep">|</span>
-    <span style="white-space:nowrap;color:var(--text2)">Claude (분류용)</span>
-    <input type="password" id="claudeKeyInput" placeholder="sk-ant-..." style="width:160px" />
-    <button class="btn btn-sm" style="background:var(--text);color:#fff;border:none;font-size:11px;" onclick="saveClaudeKey()">저장</button>
-    <a href="https://developers.naver.com" target="_blank" style="font-size:11px;color:inherit;opacity:.6;white-space:nowrap;margin-left:4px;">네이버 키 발급↗</a>
+  <div id="keyBanner" class="key-banner warn" style="cursor:pointer;user-select:none;" onclick="toggleKeyPanel()">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+    <span style="font-weight:600;" id="bannerMsg">API 키 설정 ▾</span>
+    <span style="margin-left:auto;font-size:11px;opacity:.6;">클릭하여 설정</span>
+  </div>
+
+  <!-- KEY PANEL (드롭다운) -->
+  <div id="keyPanel" style="display:none;background:#F8F7F3;border-bottom:1px solid var(--border);padding:14px 28px;">
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-end;">
+
+      <!-- 네이버 -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+          <span style="background:#E8F5E9;color:#2E7D32;padding:1px 6px;border-radius:4px;font-size:10px;">NAVER</span>
+          네이버 검색 API
+          <a href="https://developers.naver.com" target="_blank" style="font-size:10px;color:var(--text3);margin-left:4px;">키 발급↗</a>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Client ID</div>
+            <input type="text" id="naverIdInput" placeholder="Client ID 입력"
+              style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;font-family:'DM Mono',monospace;background:#fff;color:var(--text);width:180px;"
+              onclick="event.stopPropagation()" />
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">Client Secret</div>
+            <input type="password" id="naverSecretInput" placeholder="Client Secret 입력"
+              style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;font-family:'DM Mono',monospace;background:#fff;color:var(--text);width:180px;"
+              onclick="event.stopPropagation()" />
+          </div>
+          <button onclick="event.stopPropagation();saveNaverKey()"
+            style="padding:7px 14px;background:var(--text);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;margin-top:18px;">
+            저장
+          </button>
+        </div>
+      </div>
+
+      <!-- Claude (선택) -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+          <span style="background:#E8EAF6;color:#3949AB;padding:1px 6px;border-radius:4px;font-size:10px;">Claude</span>
+          Claude API <span style="font-weight:400;color:var(--text3)">(중요도 분류용, 선택)</span>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" style="font-size:10px;color:var(--text3);">키 발급↗</a>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">API Key</div>
+            <input type="password" id="claudeKeyInput" placeholder="sk-ant-..."
+              style="padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;font-family:'DM Mono',monospace;background:#fff;color:var(--text);width:260px;"
+              onclick="event.stopPropagation()" />
+          </div>
+          <button onclick="event.stopPropagation();saveClaudeKey()"
+            style="padding:7px 14px;background:var(--text);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;margin-top:18px;">
+            저장
+          </button>
+        </div>
+      </div>
+
+      <button onclick="event.stopPropagation();toggleKeyPanel()"
+        style="border:none;background:none;cursor:pointer;color:var(--text3);font-size:13px;padding:0;margin-top:18px;align-self:flex-end;">
+        닫기 ✕
+      </button>
+    </div>
+    <div id="keyPanelStatus" style="font-size:12px;color:#1A8C65;margin-top:8px;min-height:16px;"></div>
   </div>
 
   <!-- TOPBAR -->
@@ -553,32 +605,70 @@ function init() {
   const useClassify = localStorage.getItem(LS.classify) === 'true';
   document.getElementById('useClaudeClassify').checked = useClassify;
   updateBanner();
+  // 키가 이미 있으면 패널 닫힌 상태로 배너만 표시
+}
+
+let _keyPanelOpen = false;
+
+function toggleKeyPanel() {
+  _keyPanelOpen = !_keyPanelOpen;
+  document.getElementById('keyPanel').style.display = _keyPanelOpen ? 'block' : 'none';
+  const msg = document.getElementById('bannerMsg');
+  msg.textContent = _keyPanelOpen ? 'API 키 설정 ▴' : (updateBannerText());
+}
+
+function updateBannerText() {
+  if (_naverId && _naverSecret) {
+    return _claudeKey ? '✓ 네이버 + Claude 연결됨 ▾' : '✓ 네이버 API 연결됨 ▾';
+  }
+  return 'API 키 설정 ▾';
 }
 
 function saveNaverKey() {
   const id  = document.getElementById('naverIdInput').value.trim();
   const sec = document.getElementById('naverSecretInput').value.trim();
-  if (!id || !sec) { alert('Client ID와 Client Secret을 모두 입력해주세요.'); return; }
+  if (!id || !sec) {
+    showKeyStatus('❌ Client ID와 Client Secret을 모두 입력해주세요.', 'red');
+    return;
+  }
   _naverId = id; _naverSecret = sec;
-  localStorage.setItem(LS.nid, id); localStorage.setItem(LS.nsec, sec);
-  updateBanner(); alert('네이버 API 키가 저장됐습니다.');
+  try {
+    localStorage.setItem(LS.nid, id);
+    localStorage.setItem(LS.nsec, sec);
+  } catch(e) { console.warn('localStorage 저장 실패:', e); }
+  updateBanner();
+  showKeyStatus('✓ 네이버 API 키가 저장됐습니다.');
 }
+
 function saveClaudeKey() {
   const key = document.getElementById('claudeKeyInput').value.trim();
-  if (!key.startsWith('sk-ant-')) { alert('Claude API 키는 sk-ant- 로 시작해야 합니다.'); return; }
+  if (!key.startsWith('sk-ant-')) {
+    showKeyStatus('❌ Claude API 키는 sk-ant- 로 시작해야 합니다.', 'red');
+    return;
+  }
   _claudeKey = key;
-  localStorage.setItem(LS.ckey, key);
-  updateBanner(); alert('Claude API 키가 저장됐습니다.');
+  try { localStorage.setItem(LS.ckey, key); } catch(e) { console.warn('localStorage 저장 실패:', e); }
+  updateBanner();
+  showKeyStatus('✓ Claude API 키가 저장됐습니다.');
 }
+
+function showKeyStatus(msg, color) {
+  const el = document.getElementById('keyPanelStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color === 'red' ? '#C43030' : '#1A8C65';
+  setTimeout(() => { el.textContent = ''; }, 3000);
+}
+
 function updateBanner() {
   const b = document.getElementById('keyBanner');
   const msg = document.getElementById('bannerMsg');
   if (_naverId && _naverSecret) {
     b.className = 'key-banner ok';
-    msg.textContent = _claudeKey ? '✓ 네이버 + Claude 연결됨' : '✓ 네이버 API 연결됨';
+    msg.textContent = _claudeKey ? '✓ 네이버 + Claude 연결됨 ▾' : '✓ 네이버 API 연결됨 ▾';
   } else {
     b.className = 'key-banner warn';
-    msg.textContent = '네이버 API 키 필요';
+    msg.textContent = 'API 키 설정 ▾';
   }
 }
 
