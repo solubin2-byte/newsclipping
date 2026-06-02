@@ -363,7 +363,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);
             &nbsp;·&nbsp; 키워드 5묶음 검색 &nbsp;·&nbsp; 최대 <strong>30건</strong> 수집 &nbsp;·&nbsp; 중복 자동 제거<br>
             <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-top:4px;">
               <input type="checkbox" id="useClassify" style="accent-color:var(--tx);">
-              Claude로 중요도 자동 분류 (크레딧 소모)
+              Claude로 카테고리 필터링 + 중요도 분류 (권장, 카테고리당 ~4원)
             </label>
           </div>
         </div>
@@ -486,18 +486,81 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);
 // DATA
 // =====================================================
 var CATS = [
-  {name:'플랫폼 & 미디어',short:'플랫폼',color:'var(--c1)',bg:'var(--c1b)',tx:'var(--c1t)',
-   queries:['메타 인스타그램 광고','구글 유튜브 광고 플랫폼','네이버 카카오 광고','당근마켓 토스 미디어','프로그래매틱 광고 미디어렙']},
-  {name:'브랜드 & 마케팅',short:'브랜드',color:'var(--c2)',bg:'var(--c2b)',tx:'var(--c2t)',
-   queries:['브랜드 마케팅 캠페인','소비트렌드 소비자조사','MZ세대 트렌드 라이프스타일','광고 크리에이티브 수상','마케팅 전략 브랜딩']},
-  {name:'커머스 & 유통',short:'커머스',color:'var(--c3)',bg:'var(--c3b)',tx:'var(--c3t)',
-   queries:['쿠팡 네이버쇼핑 이커머스','무신사 지그재그 패션커머스','알리익스프레스 테무 직구','편의점 유통 면세점','이커머스 물류 풀필먼트']},
-  {name:'테크 & AI',short:'테크·AI',color:'var(--c4)',bg:'var(--c4b)',tx:'var(--c4t)',
-   queries:['AI 인공지능 생성AI LLM','반도체 메모리 HBM','자율주행 전기차 배터리','빅테크 AI 스타트업','AI 규제 정책 산업']},
-  {name:'콘텐츠 & 엔터',short:'엔터',color:'var(--c5)',bg:'var(--c5b)',tx:'var(--c5t)',
-   queries:['K팝 아이돌 신곡 컴백','OTT 드라마 영화 흥행','팝업스토어 전시 공연','스포츠 e스포츠 중계','엔터테인먼트 시장 동향']},
-  {name:'게임',short:'게임',color:'var(--c6)',bg:'var(--c6b)',tx:'var(--c6t)',
-   queries:['모바일게임 신작 출시','넥슨 크래프톤 넷마블 게임','게임 매출 흥행 순위','e스포츠 대회 리그','게임 시장 동향 전략']}
+  {
+    name:'플랫폼 & 미디어', short:'플랫폼', color:'var(--c1)', bg:'var(--c1b)', tx:'var(--c1t)',
+    // 각 쿼리는 "검색어 -제외어" 형태로 네이버 검색에 그대로 사용
+    queries:[
+      '메타 페이스북 인스타그램 광고',
+      '구글 유튜브 광고 플랫폼',
+      '네이버 카카오 광고 플랫폼',
+      '당근마켓 토스 광고 미디어',
+      '프로그래매틱 광고 미디어렙 DSP'
+    ],
+    // Claude 후처리 시 전달되는 카테고리 설명
+    desc:'메타(FB/IG), 구글(유튜브 등), 네이버, 카카오, 당근, 토스 등 주요 광고 플랫폼 및 미디어렙·미디어 업계 소식. 광고 상품 출시, 알고리즘 변경, MAU 동향, 미디어 M&A 등 포함.',
+    // 이 카테고리와 무관한 키워드가 포함된 기사 제거 기준
+    exclude:'게임 신작 모바일게임 콘솔 e스포츠 연예인 아이돌 드라마 영화 쇼핑 쿠팡 무신사 배터리 자율주행'
+  },
+  {
+    name:'브랜드 & 마케팅', short:'브랜드', color:'var(--c2)', bg:'var(--c2b)', tx:'var(--c2t)',
+    queries:[
+      '브랜드 마케팅 캠페인 광고',
+      '소비트렌드 소비자 조사 리포트',
+      'MZ세대 알파세대 소비 트렌드',
+      '광고 크리에이티브 캠페인 수상',
+      '마케팅 전략 브랜딩 소비자'
+    ],
+    desc:'소비/문화 트렌드, 소비자 라이프스타일 변화, 소비자 조사 결과, 마케팅 트렌드, 삼성·신세계·삼양 등 다양한 브랜드의 마케팅·광고 캠페인 관련 뉴스.',
+    exclude:'게임 신작 모바일게임 반도체 배터리 자율주행 쿠팡 이커머스 아이돌 신곡 공연 팝업스토어'
+  },
+  {
+    name:'커머스 & 유통', short:'커머스', color:'var(--c3)', bg:'var(--c3b)', tx:'var(--c3t)',
+    queries:[
+      '쿠팡 네이버쇼핑 이커머스 유통',
+      '무신사 지그재그 에이블리 패션몰',
+      '알리익스프레스 테무 쉬인 직구',
+      '편의점 CU GS25 세븐일레븐 유통',
+      '이커머스 물류 풀필먼트 온라인쇼핑'
+    ],
+    desc:'쿠팡·네이버플러스스토어·지마켓·지그재그·무신사·알리·테무 등 커머스 플랫폼, 편의점·면세점·대형마트 등 오프라인 유통사 동향, 물류·배송 전략, 이커머스 시장 통계.',
+    exclude:'게임 반도체 배터리 아이돌 공연 영화 OTT 마케팅 캠페인 광고'
+  },
+  {
+    name:'테크 & AI', short:'테크·AI', color:'var(--c4)', bg:'var(--c4b)', tx:'var(--c4t)',
+    queries:[
+      'AI 인공지능 생성AI LLM 챗GPT',
+      '반도체 메모리 HBM 삼성 SK하이닉스',
+      '자율주행 전기차 배터리 테슬라',
+      '빅테크 AI 스타트업 투자',
+      'AI 규제 정책 로봇 기술 산업'
+    ],
+    desc:'AI·LLM·생성AI, 반도체·배터리·자율주행·메모리, 빅테크(애플·구글·MS·메타) 기술 전략, 국내 AI 스타트업, 테크 규제 이슈 등.',
+    exclude:'게임 신작 모바일게임 아이돌 드라마 영화 쿠팡 이커머스 광고 캠페인'
+  },
+  {
+    name:'콘텐츠 & 엔터', short:'엔터', color:'var(--c5)', bg:'var(--c5b)', tx:'var(--c5t)',
+    queries:[
+      'K팝 아이돌 신곡 컴백 뮤비',
+      'OTT 넷플릭스 드라마 영화 흥행',
+      '팝업스토어 전시 공연 뮤지컬',
+      'KBO 프로야구 스포츠 중계',
+      '엔터테인먼트 하이브 SM JYP YG'
+    ],
+    desc:'K팝 아이돌 신곡·컴백·뮤비, 영화·드라마·OTT 흥행, 팝업스토어·전시·공연, 스포츠(야구·축구·e스포츠), 엔터사(하이브·SM·JYP·YG) 전략 및 엔터 시장 동향.',
+    exclude:'게임 신작 모바일게임 넥슨 크래프톤 반도체 이커머스 쿠팡 광고 마케팅'
+  },
+  {
+    name:'게임', short:'게임', color:'var(--c6)', bg:'var(--c6b)', tx:'var(--c6t)',
+    queries:[
+      '모바일게임 신작 출시 흥행',
+      '넥슨 크래프톤 넷마블 엔씨소프트',
+      '게임 매출 순위 흥행 글로벌',
+      'LOL 리그오브레전드 e스포츠 대회',
+      '게임 시장 콘솔 PC 동향'
+    ],
+    desc:'주요 게임사(넥슨·크래프톤·넷마블·NC·스마일게이트 등) 신작 출시·매출·전략, 모바일·PC·콘솔 게임 흥행, e스포츠 대회, 게임 시장 동향.',
+    exclude:'엔터 아이돌 드라마 영화 OTT 이커머스 반도체 광고 마케팅'
+  }
 ];
 
 var LS = {nid:'idl_nid',nsec:'idl_nsec',ckey:'idl_ckey'};
@@ -765,8 +828,8 @@ async function fetchNews(){
   var deduped = dedup(all);
   var useC = document.getElementById('useClassify').checked;
   if(useC && claudeKey && deduped.length>0){
-    setStatus('loading','<strong>'+cat.name+'</strong> — Claude로 중요도 분류 중...');
-    deduped = await classifyWithClaude(deduped);
+    setStatus('loading','<strong>'+cat.name+'</strong> — Claude로 카테고리 필터링 및 중요도 분류 중...');
+    deduped = await classifyWithClaude(deduped, selCat);
   }
 
   collected[selCat] = deduped;
@@ -818,7 +881,10 @@ async function fetchAllCats(){
     }
 
     var deduped = dedup(all);
-    if(useC && claudeKey && deduped.length>0) deduped = await classifyWithClaude(deduped);
+    if(useC && claudeKey && deduped.length>0){
+      document.getElementById('apc'+ci).textContent='분류 중...';
+      deduped = await classifyWithClaude(deduped, ci);
+    }
     collected[ci] = deduped;
     updateBadge(ci, deduped.length);
     document.getElementById('ap'+ci).className='ap done';
@@ -835,32 +901,66 @@ async function fetchAllCats(){
 }
 
 // =====================================================
-// CLAUDE CLASSIFY (optional)
+// CLAUDE 후처리: 카테고리 필터링 + 중요도 분류
 // =====================================================
-async function classifyWithClaude(articles){
-  var titles = articles.map(function(a,i){ return (i+1)+'. '+a.title+' ['+a.source+']'; }).join('\n');
-  var prompt = '다음 뉴스 기사 목록의 중요도를 분류해주세요.\n\n'+titles+'\n\n분류기준:\n- "hot": 업계 파급력 크거나 화제\n- "excl": 단독보도, 특종\n- "multi": 다수 언론사 동시 보도\n- "normal": 일반 동향\n\n순수 JSON만 응답:\n{"results":[{"index":1,"priority":"hot","reason":"이유"}]}';
+
+// 공신력 있는 주요 언론사 목록
+var MAJOR_SOURCES = ['연합뉴스','뉴스1','YTN','매일경제','한국경제','한국일보','서울경제','세계일보','조선일보','한겨레','지디넷코리아','전자신문','블로터','파이낸셜뉴스','아이뉴스24','머니투데이','뉴시스','스포츠동아','더팩트','IT조선','헤럴드경제','이데일리','디지털투데이'];
+
+async function classifyWithClaude(articles, catIdx){
+  var cat = CATS[catIdx];
+  var titles = articles.map(function(a,i){ return (i+1)+'. ['+a.source+'] '+a.title; }).join('\n');
+
+  var prompt = '당신은 마케팅/미디어 업계 뉴스 큐레이터입니다.\n\n'
+    + '[카테고리] '+cat.name+'\n'
+    + '[카테고리 설명] '+cat.desc+'\n'
+    + '[이 카테고리와 무관한 키워드] '+cat.exclude+'\n'
+    + '[주요 언론사] '+MAJOR_SOURCES.join(', ')+'\n\n'
+    + '아래 기사 목록을 검토하여 다음 기준으로 처리해주세요:\n\n'
+    + '1. 카테고리 적합성: 이 카테고리와 무관한 기사는 "drop"으로 표시\n'
+    + '2. 중요도 분류 (카테고리에 맞는 기사만):\n'
+    + '   - "hot": 업계 파급력이 크거나 이슈가 된 화제 기사\n'
+    + '   - "excl": 단독 보도, 특종, 업계 최초 공개\n'
+    + '   - "multi": 다수 언론사가 동시에 보도한 주요 이슈\n'
+    + '   - "normal": 일반 업계 동향 기사\n'
+    + '3. 공신력: 주요 언론사 기사를 우선하되, 전문 매체도 포함\n\n'
+    + '[기사 목록]\n' + titles + '\n\n'
+    + '순수 JSON만 응답 (마크다운 없이):\n'
+    + '{"results":[{"index":1,"priority":"hot","keep":true,"reason":"선정 이유 한 줄"}]}\n'
+    + 'drop할 기사는 keep:false, priority:"drop"으로 표시';
+
   try{
     var res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,messages:[{role:'user',content:prompt}]})
     });
     if(!res.ok) throw new Error('Claude '+res.status);
     var data = await res.json();
     var txt = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
     txt = txt.replace(/```json|```/g,'').trim();
-    var s=txt.indexOf('{'),e=txt.lastIndexOf('}');
+    var s=txt.indexOf('{'), e=txt.lastIndexOf('}');
     if(s===-1||e===-1) throw new Error('JSON 없음');
     var parsed = JSON.parse(txt.slice(s,e+1));
+    var filtered = [];
     (parsed.results||[]).forEach(function(r){
-      var idx=r.index-1;
-      if(articles[idx]){ articles[idx].priority=r.priority||'normal'; articles[idx].reason=r.reason||''; }
+      var idx = r.index-1;
+      if(!articles[idx]) return;
+      if(r.keep === false || r.priority === 'drop') return; // 카테고리 부적합 제거
+      articles[idx].priority = r.priority || 'normal';
+      articles[idx].reason   = r.reason   || '';
+      filtered.push(articles[idx]);
     });
-    var order={hot:0,excl:1,multi:2,normal:3};
-    articles.sort(function(a,b){ return (order[a.priority]||3)-(order[b.priority]||3); });
-  } catch(e){ console.warn('[Claude 분류 실패]',e.message); }
-  return articles;
+    // Claude가 응답 안 한 기사는 keep 처리 (안전장치)
+    if(filtered.length === 0) filtered = articles;
+    // priority 순 정렬
+    var order = {hot:0, excl:1, multi:2, normal:3};
+    filtered.sort(function(a,b){ return (order[a.priority]||3)-(order[b.priority]||3); });
+    return filtered;
+  } catch(e){
+    console.warn('[Claude 분류 실패]', e.message);
+    return articles; // 실패 시 원본 반환
+  }
 }
 
 // =====================================================
