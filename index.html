@@ -971,16 +971,19 @@ async function classifyWithClaude(articles, catIdx){
     + '- "excl": 단독 보도, 특종\n'
     + '- "normal": 일반 동향\n\n'
     + '### 목표\n'
-    + '최종 결과는 서로 다른 주제의 기사들로만 구성. 동일 주제 반복 절대 금지.\n\n'
-    + '[기사 목록]\n' + titles + '\n\n'
+    + '- 서로 다른 주제의 기사들로 구성. 동일 주제는 1건으로 압축.\n'
+    + '- 전체 기사의 40% 이상은 반드시 keep:true (과도한 제거 금지)\n'
+    + '- 카테고리에 맞는 기사는 적극적으로 keep:true\n\n'
+    + '[기사 목록 (총 '+articles.length+'건)]\n' + titles + '\n\n'
+    + '모든 '+articles.length+'개 기사에 빠짐없이 결과를 반환하세요.\n'
     + '순수 JSON만 응답 (마크다운 없이):\n'
-    + '{"results":[{"index":1,"priority":"multi","keep":true,"reason":"인스타그램 유료구독 이슈 대표 기사, 동일 주제 중 연합뉴스 선택"}]}';
+    + '{"results":[{"index":1,"priority":"multi","keep":true,"reason":"선정이유"}]}';
 
   try{
     var res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:4000,messages:[{role:'user',content:prompt}]})
     });
     if(!res.ok) throw new Error('Claude '+res.status);
     var data = await res.json();
@@ -989,24 +992,45 @@ async function classifyWithClaude(articles, catIdx){
     var s=txt.indexOf('{'), e=txt.lastIndexOf('}');
     if(s===-1||e===-1) throw new Error('JSON 없음');
     var parsed = JSON.parse(txt.slice(s,e+1));
+
+    var keepMap = {}; // index -> result
+    (parsed.results||[]).forEach(function(r){ if(r.index) keepMap[r.index] = r; });
+
     var filtered = [];
-    (parsed.results||[]).forEach(function(r){
-      var idx = r.index-1;
-      if(!articles[idx]) return;
-      if(r.keep === false || r.priority === 'drop') return; // 카테고리 부적합 제거
-      articles[idx].priority = r.priority || 'normal';
-      articles[idx].reason   = r.reason   || '';
-      filtered.push(articles[idx]);
+    var dropped  = [];
+    articles.forEach(function(a, i){
+      var r = keepMap[i+1];
+      if(r && (r.keep === false || r.priority === 'drop')){
+        dropped.push(a); // 제거 대상
+      } else {
+        // keep:true 이거나 Claude가 언급 안 한 기사 → 유지
+        if(r){ a.priority = r.priority || 'normal'; a.reason = r.reason || ''; }
+        filtered.push(a);
+      }
     });
-    // Claude가 응답 안 한 기사는 keep 처리 (안전장치)
-    if(filtered.length === 0) filtered = articles;
+
+    // 안전장치: 너무 많이 제거되면 dropped에서 복구
+    // → 최소 min(10, 원본의 40%) 는 보장
+    var minKeep = Math.max(10, Math.floor(articles.length * 0.4));
+    if(filtered.length < minKeep){
+      console.warn('[Claude] 결과 너무 적음('+filtered.length+'건), dropped에서 복구');
+      // dropped를 언론사 점수 순으로 정렬해서 부족분 채움
+      dropped.sort(function(a,b){ return sourceScore(b.source)-sourceScore(a.source); });
+      var need = minKeep - filtered.length;
+      for(var i=0; i<need && i<dropped.length; i++){
+        dropped[i].priority = 'normal';
+        filtered.push(dropped[i]);
+      }
+    }
+
     // priority 순 정렬
     var order = {hot:0, excl:1, multi:2, normal:3};
     filtered.sort(function(a,b){ return (order[a.priority]||3)-(order[b.priority]||3); });
+    console.log('[Claude] 최종 '+filtered.length+'건 (원본 '+articles.length+'건, '+dropped.length+'건 drop)');
     return filtered;
   } catch(e){
     console.warn('[Claude 분류 실패]', e.message);
-    return articles; // 실패 시 원본 반환
+    return articles; // 실패 시 원본 전체 반환
   }
 }
 
