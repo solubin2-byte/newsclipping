@@ -761,15 +761,55 @@ function makeArticle(item, catIdx, qi, ii){
   return {title:title,url:url,source:source,date:date,summary:summary,imageUrl:null,priority:'normal',reason:'',catIdx:catIdx,id:'n_'+catIdx+'_'+qi+'_'+ii+'_'+Date.now()};
 }
 
+// 언론사 신뢰도 점수 (높을수록 우선)
+var SOURCE_RANK = {
+  '연합뉴스':10,'뉴스1':9,'YTN':9,
+  '조선일보':8,'한겨레':8,'매일경제':8,'한국경제':8,'한국일보':8,
+  '서울경제':7,'세계일보':7,'헤럴드경제':7,'이데일리':7,'파이낸셜뉴스':7,
+  '머니투데이':6,'뉴시스':6,'아이뉴스24':6,
+  '지디넷코리아':6,'전자신문':6,'IT조선':6,'블로터':5,
+  '스포츠동아':5,'더팩트':5,'디지털투데이':5
+};
+
+function sourceScore(src){ return SOURCE_RANK[src] || 1; }
+
+// 제목에서 핵심 키워드 추출 (앞 10글자, 공백 제거)
+function titleKey(t){ return (t||'').replace(/\s|[\[\]\(\)'"<>]/g,'').slice(0,12).toLowerCase(); }
+
+// 주제 클러스터링 중복 제거:
+// 같은 주제(제목 앞부분 유사)가 여러 건이면 가장 신뢰도 높은 언론사 1건만 남김
 function dedup(arts){
-  var su=new Set(), st=new Set(), res=[];
+  // 1단계: URL 완전 중복 제거
+  var seenUrl = new Set(), urlDeduped = [];
   arts.forEach(function(a){
-    var uk=(a.url||'').replace(/https?:\/\/(www\.)?/,'').replace(/\/$/,'').toLowerCase().slice(0,80);
-    var tk=(a.title||'').replace(/\s/g,'').slice(0,20);
-    if((uk&&su.has(uk))||(tk&&st.has(tk))) return;
-    if(uk) su.add(uk); if(tk) st.add(tk);
-    res.push(a);
+    var uk = (a.url||'').replace(/https?:\/\/(www\.)?/,'').replace(/\/$/,'').toLowerCase().slice(0,80);
+    if(uk && seenUrl.has(uk)) return;
+    if(uk) seenUrl.add(uk);
+    urlDeduped.push(a);
   });
+
+  // 2단계: 제목 키 기준으로 클러스터링 → 각 클러스터에서 언론사 점수 1위만 남김
+  var clusters = {}; // titleKey -> [articles]
+  urlDeduped.forEach(function(a){
+    var tk = titleKey(a.title);
+    if(!clusters[tk]) clusters[tk] = [];
+    clusters[tk].push(a);
+  });
+
+  var res = [];
+  Object.values(clusters).forEach(function(group){
+    if(group.length === 1){ res.push(group[0]); return; }
+    // 같은 주제 여러 건 → 언론사 점수 가장 높은 1건 선택
+    group.sort(function(a,b){ return sourceScore(b.source) - sourceScore(a.source); });
+    var best = group[0];
+    // 멀티소스 표시: 2개 이상 언론사가 보도했으면 multi 태그
+    if(group.length >= 2 && best.priority === 'normal'){
+      best.priority = 'multi';
+      best.reason = group.slice(1,4).map(function(x){ return x.source; }).join(', ')+' 등 '+group.length+'개 매체 동시 보도';
+    }
+    res.push(best);
+  });
+
   return res;
 }
 
@@ -925,9 +965,10 @@ async function classifyWithClaude(articles, catIdx){
     + '   - "normal": 일반 업계 동향 기사\n'
     + '3. 공신력: 주요 언론사 기사를 우선하되, 전문 매체도 포함\n\n'
     + '[기사 목록]\n' + titles + '\n\n'
+    + '4. 동일 주제 중복 제거: 같은 사건/이슈를 다루는 기사가 여러 건이면 가장 공신력 있는 언론사 기사 1건만 keep:true, 나머지는 keep:false\n\n'
     + '순수 JSON만 응답 (마크다운 없이):\n'
     + '{"results":[{"index":1,"priority":"hot","keep":true,"reason":"선정 이유 한 줄"}]}\n'
-    + 'drop할 기사는 keep:false, priority:"drop"으로 표시';
+    + 'drop할 기사: keep:false 처리. 목표는 다양한 주제를 최대한 많이 커버하되 동일 주제는 1건으로 압축';
 
   try{
     var res = await fetch('https://api.anthropic.com/v1/messages',{
