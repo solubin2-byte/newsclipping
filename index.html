@@ -328,6 +328,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);
       <span class="tb-sub" id="tb-sub">카테고리를 선택하고 수집하세요</span>
     </div>
     <div class="topbar-r">
+      <label id="classify-toggle" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--tx2);padding:6px 10px;border:1px solid var(--bd);border-radius:var(--rs);background:var(--sur);user-select:none;" title="수집 후 Claude가 동일 주제 중복 제거 + 카테고리 필터링 + 중요도 분류를 수행합니다">
+        <input type="checkbox" id="useClassify" style="accent-color:var(--tx);width:14px;height:14px;" checked>
+        <span class="tag tag-c" style="font-size:10px;">Claude</span>
+        중복제거·분류
+      </label>
       <button class="btn btn-line btn-sm" onclick="goTab('selected')">선택됨 <span id="tb-sel" style="font-family:'DM Mono',monospace;font-weight:600;">0</span>건</button>
       <button class="btn btn-dark btn-sm" id="btn-all" onclick="fetchAllCats()">전체 카테고리 수집</button>
     </div>
@@ -348,7 +353,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);
       <div class="info-bar">
         <span class="tag tag-n">NAVER</span> 네이버 뉴스 검색 API로 수집 (무료, 일 25,000건)
         <span style="color:var(--bd2)">·</span>
-        <span class="tag tag-c">Claude</span> 수집 후 중요도 분류·요약 (선택)
+        <span class="tag tag-c">Claude</span> 동일 주제 중복 제거 + 카테고리 필터링 + 중요도 분류 (카테고리당 약 4원)
       </div>
 
       <div class="section">
@@ -358,13 +363,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--tx);
             <input class="kw-in" id="extraKw" type="text" placeholder="추가 키워드 (선택, 예: 쿠팡 로켓배송)">
             <button class="btn btn-line" id="btn-fetch" onclick="fetchNews()">이 카테고리 수집</button>
           </div>
-          <div style="margin-top:10px;font-size:12px;color:var(--tx2);line-height:1.7;">
+          <div style="margin-top:8px;font-size:12px;color:var(--tx2);">
             현재 선택: <strong id="cur-cat" style="color:var(--tx)">플랫폼 &amp; 미디어</strong>
-            &nbsp;·&nbsp; 키워드 5묶음 검색 &nbsp;·&nbsp; 최대 <strong>30건</strong> 수집 &nbsp;·&nbsp; 중복 자동 제거<br>
-            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-top:4px;">
-              <input type="checkbox" id="useClassify" style="accent-color:var(--tx);">
-              Claude로 카테고리 필터링 + 중요도 분류 (권장, 카테고리당 ~4원)
-            </label>
+            &nbsp;·&nbsp; 키워드 5묶음 검색 &nbsp;·&nbsp; 최대 <strong>30건</strong> 수집
+            &nbsp;·&nbsp; <span style="color:var(--c2t)">상단 "Claude 중복제거·분류" 체크 시 동일 주제 자동 압축</span>
           </div>
         </div>
       </div>
@@ -951,24 +953,28 @@ async function classifyWithClaude(articles, catIdx){
   var cat = CATS[catIdx];
   var titles = articles.map(function(a,i){ return (i+1)+'. ['+a.source+'] '+a.title; }).join('\n');
 
-  var prompt = '당신은 마케팅/미디어 업계 뉴스 큐레이터입니다.\n\n'
+  var prompt = '당신은 마케팅/미디어 업계 뉴스 에디터입니다. 주간 뉴스레터용 기사를 선별합니다.\n\n'
     + '[카테고리] '+cat.name+'\n'
     + '[카테고리 설명] '+cat.desc+'\n'
-    + '[이 카테고리와 무관한 키워드] '+cat.exclude+'\n'
-    + '[주요 언론사] '+MAJOR_SOURCES.join(', ')+'\n\n'
-    + '아래 기사 목록을 검토하여 다음 기준으로 처리해주세요:\n\n'
-    + '1. 카테고리 적합성: 이 카테고리와 무관한 기사는 "drop"으로 표시\n'
-    + '2. 중요도 분류 (카테고리에 맞는 기사만):\n'
-    + '   - "hot": 업계 파급력이 크거나 이슈가 된 화제 기사\n'
-    + '   - "excl": 단독 보도, 특종, 업계 최초 공개\n'
-    + '   - "multi": 다수 언론사가 동시에 보도한 주요 이슈\n'
-    + '   - "normal": 일반 업계 동향 기사\n'
-    + '3. 공신력: 주요 언론사 기사를 우선하되, 전문 매체도 포함\n\n'
+    + '[제외 기준] 아래 키워드가 주제인 기사는 이 카테고리에 포함하지 않음: '+cat.exclude+'\n'
+    + '[주요 언론사 우선순위] '+MAJOR_SOURCES.join(', ')+'\n\n'
+    + '## 처리 규칙 (반드시 준수)\n\n'
+    + '### 규칙 1: 동일 주제 중복 제거 (가장 중요)\n'
+    + '같은 사건/발표/이슈를 다루는 기사가 여러 개면 → 주요 언론사 1건만 keep:true, 나머지 전부 keep:false\n'
+    + '예시: "인스타그램 유료 구독 출시" 관련 기사가 5개 → 연합뉴스나 매일경제 등 1건만 남김\n'
+    + '예시: "쿠팡 실적 발표" 기사가 3개 → 1건만 남김\n\n'
+    + '### 규칙 2: 카테고리 적합성\n'
+    + '제외 기준 키워드가 주제인 기사 → keep:false\n\n'
+    + '### 규칙 3: 중요도 분류 (keep:true인 기사만)\n'
+    + '- "multi": 이번 목록에서 동일 주제로 2건 이상 보도됨 (대표 1건 선택)\n'
+    + '- "hot": 업계 파급력이 크거나 화제\n'
+    + '- "excl": 단독 보도, 특종\n'
+    + '- "normal": 일반 동향\n\n'
+    + '### 목표\n'
+    + '최종 결과는 서로 다른 주제의 기사들로만 구성. 동일 주제 반복 절대 금지.\n\n'
     + '[기사 목록]\n' + titles + '\n\n'
-    + '4. 동일 주제 중복 제거: 같은 사건/이슈를 다루는 기사가 여러 건이면 가장 공신력 있는 언론사 기사 1건만 keep:true, 나머지는 keep:false\n\n'
     + '순수 JSON만 응답 (마크다운 없이):\n'
-    + '{"results":[{"index":1,"priority":"hot","keep":true,"reason":"선정 이유 한 줄"}]}\n'
-    + 'drop할 기사: keep:false 처리. 목표는 다양한 주제를 최대한 많이 커버하되 동일 주제는 1건으로 압축';
+    + '{"results":[{"index":1,"priority":"multi","keep":true,"reason":"인스타그램 유료구독 이슈 대표 기사, 동일 주제 중 연합뉴스 선택"}]}';
 
   try{
     var res = await fetch('https://api.anthropic.com/v1/messages',{
